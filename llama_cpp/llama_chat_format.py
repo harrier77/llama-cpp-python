@@ -4095,3 +4095,34 @@ def gguf_function_calling(
         }
         chat_completion["choices"][0]["message"]["function_call"] = single_function_call
     return chat_completion
+
+
+def get_chat_completion_handler(name: str):
+    """
+    Restituisce l'handler di chat completion per il formato specificato (compatibilità con API originale).
+    Prova il registry del fork; fallback diretto per 'chatml' (per SmolLM3) se registry non accessibile.
+    """
+    try:
+        # Prova il registry Singleton
+        registry = LlamaChatCompletionHandlerRegistry()
+        if hasattr(registry, '_handlers') and isinstance(registry._handlers, dict):
+            handler = registry._handlers.get(name)
+            if handler:
+                return handler  # Handler registrato (LlamaChatCompletionHandler)
+        
+        # Fallback: Per 'chatml', usa direttamente la funzione definita nel file (già in scope)
+        if name == "chatml":
+            formatter = format_chatml  # Riferimento diretto (locale, no import)
+            handler = chat_formatter_to_chat_completion_handler(formatter)
+            return handler
+        
+        # Se non 'chatml', elenca disponibili (se registry ok) o errore
+        if hasattr(registry, '_handlers') and isinstance(registry._handlers, dict):
+            available = list(registry._handlers.keys())
+            raise ValueError(f"Handler non trovato per '{name}'. Formati disponibili: {available}")
+        else:
+            raise ValueError(f"Registry non accessibile per '{name}'. Prova 'chatml' per SmolLM3.")
+    
+    except Exception as e:
+        raise ValueError(f"Errore nel retrieval handler: {e}")
+
